@@ -1,0 +1,53 @@
+name: Check Directory Structure
+
+on:
+  pull_request:
+    paths:
+      - '**' # 只要 PR 修改了文件就触发
+
+jobs:
+  check-dirs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify README, docs and release directories
+        run: |
+          # 查找当前仓库下的所有一级子目录
+          # 忽略 .github 等系统隐藏目录
+          ERROR_MSG=""
+          
+          for dir in */ ; do
+            # 去除末尾的斜杠
+            dir_name=${dir%/}
+            
+            # 排除以点开头的隐藏目录
+            if [[ "$dir_name" == .* ]]; then
+              continue
+            fi
+            
+            # 1. 检查 README.md 文件
+            if [ ! -f "$dir_name/README.md" ]; then
+              ERROR_MSG="${ERROR_MSG}\n❌ 错误：目录 '$dir_name' 下缺少必需的 'README.md' 文件！"
+            fi
+            
+            # 2. 检查 docs 目录
+            if [ ! -d "$dir_name/docs" ]; then
+              ERROR_MSG="${ERROR_MSG}\n❌ 错误：目录 '$dir_name' 下缺少必需的 'docs' 子目录！"
+            fi
+            
+            # 3. 检查 release 目录
+            if [ ! -d "$dir_name/release" ]; then
+              ERROR_MSG="${ERROR_MSG}\n❌ 错误：目录 '$dir_name' 下缺少必需的 'release' 子目录！"
+            fi
+          done
+          
+          # 如果有错误信息，打印并终止报错
+          if [ -n "$ERROR_MSG" ]; then
+            echo -e "$ERROR_MSG"
+            echo "::error::目录结构校验失败，请确保每个模块都包含 README.md, docs 和 release。"
+            exit 1
+          else
+            echo "✅ 目录结构校验通过！"
+          fi
