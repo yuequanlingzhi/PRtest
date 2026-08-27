@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# pre-push: 拦截直推 main，并打印当前分支的 PR 创建链接
+set -euo pipefail
+
+protected_branch="main"
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+# stdin: <local_ref> <local_sha> <remote_ref> <remote_sha>
+while read -r local_ref local_sha remote_ref remote_sha; do
+  remote_branch=${remote_ref#refs/heads/}
+  if [[ "$remote_branch" == "$protected_branch" ]]; then
+    echo "ERROR: 禁止直接 push 到 ${protected_branch}。请推 feature/fix 分支并开 PR。" >&2
+    exit 1
+  fi
+done
+
+remote=$(git remote get-url origin 2>/dev/null || true)
+if [[ -n "$remote" ]]; then
+  repo=$(printf '%s' "$remote" | sed -E 's|^git@github.com:|https://github.com/|; s|\.git$||; s|^ssh://git@github.com/|https://github.com/|')
+  echo ""
+  echo "Create PR: ${repo}/pull/new/${current_branch}"
+  echo ""
+fi
+
+exit 0
