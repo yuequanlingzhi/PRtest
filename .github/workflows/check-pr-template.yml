@@ -1,0 +1,70 @@
+name: Check PR Template
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-pr-body:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR description against template
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          ERRORS=()
+
+          if [ -z "${PR_BODY//[[:space:]]/}" ]; then
+            ERRORS+=("PR 描述为空，请使用 .github/PULL_REQUEST_TEMPLATE.md 填写")
+          else
+            # 去掉 HTML 注释，避免把占位说明当成正文
+            BODY=$(printf '%s\n' "$PR_BODY" | sed -E 's/<!--([^-]|-[^-]|--[^>])*-->//g')
+
+            # 变更摘要：下一节之前必须有非空正文
+            SUMMARY=$(printf '%s\n' "$BODY" | awk '
+              /^## 变更摘要/ {flag=1; next}
+              /^## / {if(flag) exit}
+              flag {print}
+            ' | sed '/^[[:space:]]*$/d')
+            if [ -z "$SUMMARY" ]; then
+              ERRORS+=("缺少「变更摘要」正文（1～3 句话说明改了什么、为什么改）")
+            fi
+
+            # 影响模块：至少一个勾选
+            if ! printf '%s\n' "$BODY" | grep -Eq '^- \[x\] .*(module_A|module_B|其他)'; then
+              ERRORS+=("「影响模块」至少勾选一项（module_A / module_B / 其他）")
+            fi
+
+            # 测试情况：至少一个勾选
+            if ! printf '%s\n' "$BODY" | grep -Eq '^- \[x\] (本地已自测通过|仅文档/结构变更，无需功能测试)'; then
+              ERRORS+=("「测试情况」至少勾选一项")
+            fi
+
+            # 关联问题：下一节之前必须有非空内容（如 #12 或「无」）
+            ISSUE=$(printf '%s\n' "$BODY" | awk '
+              /^## 关联问题/ {flag=1; next}
+              /^## / {if(flag) exit}
+              flag {print}
+            ' | sed '/^[[:space:]]*$/d; /^[[:space:]]*-[[:space:]]*$/d')
+            if [ -z "$ISSUE" ]; then
+              ERRORS+=("缺少「关联问题」（填写 Issue 如 #12，无则写「无」）")
+            fi
+
+            # 自审确认：必须勾选
+            if ! printf '%s\n' "$BODY" | grep -Eq '^- \[x\] 我已经仔细阅读上述内容，确认无误'; then
+              ERRORS+=("请勾选「自审确认」：我已经仔细阅读上述内容，确认无误")
+            fi
+          fi
+
+          if [ ${#ERRORS[@]} -gt 0 ]; then
+            echo "::error::PR 模板校验失败，请按 .github/PULL_REQUEST_TEMPLATE.md 补全描述"
+            printf '%s\n' "${ERRORS[@]}" | while read -r line; do
+              echo "❌ $line"
+              echo "::error::$line"
+            done
+            exit 1
+          fi
+
+          echo "✅ PR 模板校验通过"
