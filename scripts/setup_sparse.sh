@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# 稀疏检出：始终拉取公共目录 + 各模块 docs/release（含 README），
+# 稀疏检出（non-cone）：始终拉取公共目录 + 各模块 docs/release/README.md，
 # 额外参数指定要「全量」拉取的模块。
 #
 # 用法:
 #   bash scripts/setup_sparse.sh              # 只拉公共 + 各模块文档结构
 #   bash scripts/setup_sparse.sh module_A     # 再全量拉 module_A
 #   bash scripts/setup_sparse.sh module_A module_B
+#
+# 使用 --stdin 写入规则，避免 Git Bash(Windows) 把 /module_X/... 参数改写成盘符路径。
 set -euo pipefail
 
 root=$(git rev-parse --show-toplevel)
@@ -16,13 +18,12 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   exit 1
 fi
 
-# 始终包含的公共目录
-paths=(.github .githooks scripts)
+# non-cone：先包含根目录文件，再排除根下子目录，随后按需加回
+patterns=('/*' '!/*/' '/.github/**' '/.githooks/**' '/scripts/**')
 
 # 从 Git 树枚举一级目录（不依赖当前工作区是否已检出）
 mapfile -t top_dirs < <(git ls-tree -d --name-only HEAD)
 
-is_full=false
 full_modules=()
 for arg in "$@"; do
   full_modules+=("$arg")
@@ -45,10 +46,10 @@ for dir in "${top_dirs[@]}"; do
   [[ "$dir" == "docs" ]] && continue
 
   if contains "$dir" "${full_modules[@]+"${full_modules[@]}"}"; then
-    paths+=("$dir")
+    patterns+=("/${dir}/**")
   else
-    # 其他模块：只拉 docs / release（cone 模式会带上同级 README.md）
-    paths+=("$dir/docs" "$dir/release")
+    # 非全量模块：只拉 docs / release / 同级 README.md（不带上同级其他文件）
+    patterns+=("/${dir}/docs/**" "/${dir}/release/**" "/${dir}/README.md")
   fi
 done
 
@@ -61,14 +62,14 @@ for m in "${full_modules[@]+"${full_modules[@]}"}"; do
   fi
 done
 
-echo "sparse-checkout set -> ${paths[*]}"
-git sparse-checkout set "${paths[@]}"
+echo "sparse-checkout set --no-cone -> ${patterns[*]}"
+printf '%s\n' "${patterns[@]}" | git sparse-checkout set --no-cone --stdin
 
 git config core.hooksPath .githooks
 echo "已启用钩子: core.hooksPath=.githooks"
 
 if [ ${#full_modules[@]} -eq 0 ]; then
-  echo "未指定全量模块：各模块仅 docs/ + release/（含 README.md）"
+  echo "未指定全量模块：各模块仅 docs/ + release/ + README.md"
 else
   echo "全量模块: ${full_modules[*]}"
 fi
