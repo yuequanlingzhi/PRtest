@@ -18,12 +18,21 @@ jobs:
           # 忽略 .github 等系统隐藏目录
           ERROR_MSG=""
           
+          # 非业务模块：不做 README/docs/release 结构校验
+          NON_MODULES="scripts|docs"
+
           for dir in */ ; do
             # 去除末尾的斜杠
             dir_name=${dir%/}
             
             # 排除以点开头的隐藏目录
             if [[ "$dir_name" == .* ]]; then
+              continue
+            fi
+
+            # 排除 scripts 等基础设施目录
+            if [[ "$dir_name" =~ ^($NON_MODULES)$ ]]; then
+              echo "跳过非模块目录: $dir_name"
               continue
             fi
             

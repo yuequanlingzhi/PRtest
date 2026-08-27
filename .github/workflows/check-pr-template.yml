@@ -32,13 +32,23 @@ jobs:
               ERRORS+=("缺少「变更摘要」正文（1～3 句话说明改了什么、为什么改）")
             fi
 
-            # 影响模块：至少一个勾选
-            if ! printf '%s\n' "$BODY" | grep -Eq '^- \[x\] .*(module_A|module_B|其他)'; then
-              ERRORS+=("「影响模块」至少勾选一项（module_A / module_B / 其他）")
+            # 影响模块：该节内至少有一个已勾选（[x]/[X]）
+            MODULE_SECTION=$(printf '%s\n' "$BODY" | awk '
+              /^## 影响模块/ {flag=1; next}
+              /^## / {if(flag) exit}
+              flag {print}
+            ')
+            if ! printf '%s\n' "$MODULE_SECTION" | grep -Eiq '^[[:space:]]*[-*][[:space:]]*\[[xX]\]'; then
+              ERRORS+=("「影响模块」至少勾选一项（module_A / module_B / scripts / 其他）")
             fi
 
-            # 测试情况：至少一个勾选
-            if ! printf '%s\n' "$BODY" | grep -Eq '^- \[x\] (本地已自测通过|仅文档/结构变更，无需功能测试)'; then
+            # 测试情况：该节内至少有一个已勾选
+            TEST_SECTION=$(printf '%s\n' "$BODY" | awk '
+              /^## 测试情况/ {flag=1; next}
+              /^## / {if(flag) exit}
+              flag {print}
+            ')
+            if ! printf '%s\n' "$TEST_SECTION" | grep -Eiq '^[[:space:]]*[-*][[:space:]]*\[[xX]\]'; then
               ERRORS+=("「测试情况」至少勾选一项")
             fi
 
@@ -53,7 +63,7 @@ jobs:
             fi
 
             # 自审确认：必须勾选
-            if ! printf '%s\n' "$BODY" | grep -Eq '^- \[x\] 我已经仔细阅读上述内容，确认无误'; then
+            if ! printf '%s\n' "$BODY" | grep -Eiq '^[[:space:]]*[-*][[:space:]]*\[[xX]\][[:space:]]*我已经仔细阅读上述内容，确认无误'; then
               ERRORS+=("请勾选「自审确认」：我已经仔细阅读上述内容，确认无误")
             fi
           fi
