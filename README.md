@@ -15,7 +15,7 @@
 **必拉（无需手写）：**
 
 - 公共目录：`.github/`、`.githooks/`、`scripts/`
-- 每个模块的 `docs/`、`release/`（同级 `README.md` 会一起带上）
+- 每个模块的 `docs/`、`release/`、同级 `README.md`（显式拉取，不带同级其他文件）
 - 仓库根目录文件（如根 `README.md`）
 
 **全量：** 把要完整开发的模块名作为参数传入。
@@ -26,11 +26,6 @@ cd PRtest
 git sparse-checkout set scripts          # 先检出脚本
 bash scripts/setup_sparse.sh module_A    # 必拉全部 + 全量 module_A
 ```
-
-效果等价于自动算出：
-
-```text
-.github  .githooks  scripts  module_A  module_B/docs  module_B/release
 ```
 
 常用用法：
