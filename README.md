@@ -10,22 +10,39 @@
 
 ## ① 一次性准备（每人一次）
 
-按需稀疏拉取（只检出公共文件 + 你负责的模块）：
+稀疏拉取已脚本化：`scripts/setup_sparse.sh` 会自动拉齐**必拉内容**，再按参数全量拉指定模块。
+
+**必拉（无需手写）：**
+
+- 公共目录：`.github/`、`.githooks/`、`scripts/`
+- 每个模块的 `docs/`、`release/`（同级 `README.md` 会一起带上）
+- 仓库根目录文件（如根 `README.md`）
+
+**全量：** 把要完整开发的模块名作为参数传入。
 
 ```bash
 git clone --filter=blob:none --sparse https://github.com/yuequanlingzhi/PRtest.git
 cd PRtest
-git sparse-checkout set README.md docs scripts .github .githooks module_A
-git config core.hooksPath .githooks
+git sparse-checkout set scripts          # 先检出脚本
+bash scripts/setup_sparse.sh module_A    # 必拉全部 + 全量 module_A
 ```
 
-换模块时把 `module_A` 改成 `module_B`，或同时检出多个模块：
+效果等价于自动算出：
+
+```text
+.github  .githooks  scripts  module_A  module_B/docs  module_B/release
+```
+
+常用用法：
 
 ```bash
-git sparse-checkout set README.md docs scripts .github .githooks module_A module_B
+bash scripts/setup_sparse.sh                 # 只拉公共 + 各模块文档结构
+bash scripts/setup_sparse.sh module_A        # 再全量拉 A
+bash scripts/setup_sparse.sh module_B        # 换成全量 B
+bash scripts/setup_sparse.sh module_A module_B   # A、B 都全量
 ```
 
-启用钩子后，`git push` 会：
+脚本会同时执行 `git config core.hooksPath .githooks`。启用后 `git push` 会：
 
 - 拦截直推 `main`
 - 打印当前分支的 PR 创建链接
@@ -54,9 +71,9 @@ git push -u origin feature/你的改动     # 推上云端；误推 main 会被�
 | 区块 | 要求 |
 | --- | --- |
 | 变更摘要 | **必填**，1～3 句正文 |
-| 影响模块 | **必填**，至少勾一项 |
-| 文档更新 | 可选，有改动再勾 |
-| 测试情况 | **必填**，至少勾一项 |
+| 影响模块 | **必填**；选项可增删改，勾一项或改成正文说明均可 |
+| 文档更新 | 可选，有改动再勾；选项可增删改 |
+| 测试情况 | **必填**；选项可增删改，勾一项或改成正文说明均可 |
 | 关联问题 | **必填**，如 `#12`，无则写「无」 |
 | 自审确认 | **必填**，必须勾选 |
 
